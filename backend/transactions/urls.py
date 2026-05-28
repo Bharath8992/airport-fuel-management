@@ -1,0 +1,10 @@
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import FuelTransactionViewSet
+
+router = DefaultRouter()
+router.register('', FuelTransactionViewSet, basename='transaction')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]

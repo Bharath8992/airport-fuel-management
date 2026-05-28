@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: fuel_management_db
+    environment:
+      POSTGRES_DB: fuel_management
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - fuel_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fuel_management_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - fuel_network
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: fuel_management_backend
+    environment:
+      DB_NAME: fuel_management
+      DB_USER: fuel_user
+      DB_PASSWORD: fuel_password
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ../backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - fuel_network
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: fuel_management_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000/api
+    depends_on:
+      - backend
+    networks:
+      - fuel_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: fuel_management_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/staticfiles
+      - media_volume:/media
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - fuel_network
+
+networks:
+  fuel_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
