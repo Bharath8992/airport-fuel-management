@@ -174,3 +174,29 @@ SWAGGER_SETTINGS = {
         }
     }
 }
+
+AUTH_USER_MODEL = "accounts.User"  # replace "users" with your actual app name
+
+
+# Email Configuration
+# For development/testing using console backend (prints emails to console)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For testing only
+
+# For production with Gmail
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'bharathmckbytes@gmail.com'
+EMAIL_HOST_PASSWORD = 'vxcc yafq eflj vgym'  # Use App Password, not regular password
+DEFAULT_FROM_EMAIL = 'bharathmckbytes@gmail.com'
+EMAIL_USE_SSL = False
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'bharathmckbytes@gmail.com'
+EMAIL_HOST_PASSWORD = 'vxcc yafq eflj vgym'  # The 16-character app password
+DEFAULT_FROM_EMAIL = 'bharathmckbytes@gmail.com'

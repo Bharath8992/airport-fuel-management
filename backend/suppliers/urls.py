@@ -1,7 +1,11 @@
-from django.urls import path
+# suppliers/urls.py - CHANGE THIS
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
-# Temporary empty urls to avoid errors
+router = DefaultRouter()
+router.register(r'', views.SupplierViewSet, basename='supplier')  # CHANGE: Remove 'suppliers/' from here
+
 urlpatterns = [
-    # We'll add actual URLs later
+    path('', include(router.urls)),
 ]

@@ -25,6 +25,11 @@ class AirlineService {
     const response = await api.delete(`/airlines/${id}/`);
     return response.data;
   }
+
+  async toggleStatus(id) {
+    const response = await api.post(`/airlines/${id}/toggle_status/`);
+    return response.data;
+  }
 }
 
 export default new AirlineService();

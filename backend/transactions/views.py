@@ -4,73 +4,59 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from django.db.models import Sum, Count
 from django.utils import timezone
-from datetime import timedelta
 from .models import FuelTransaction
-from .serializers import FuelTransactionSerializer
+from .serializers import FuelTransactionSerializer, FuelTransactionCreateUpdateSerializer
 
 class FuelTransactionViewSet(viewsets.ModelViewSet):
-    queryset = FuelTransaction.objects.select_related('supplier', 'airline', 'airport').all()
-    serializer_class = FuelTransactionSerializer
+    queryset = FuelTransaction.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['status', 'fuel_type', 'supplier', 'airline']
+    filterset_fields = ['status', 'fuel_type', 'supplier', 'airline', 'airport']
     search_fields = ['transaction_number', 'invoice_number']
-    ordering_fields = ['transaction_date', 'total_amount']
+    ordering_fields = ['transaction_date', 'total_amount', 'created_at']
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return FuelTransactionCreateUpdateSerializer
+        return FuelTransactionSerializer
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
     
-    @action(detail=False, methods=['get'])
-    def dashboard_stats(self, request):
-        today = timezone.now().date()
-        start_of_month = today.replace(day=1)
-        start_of_week = today - timedelta(days=today.weekday())
-        
-        stats = {
-            'total_transactions': self.queryset.count(),
-            'total_suppliers': self.queryset.values('supplier').distinct().count(),
-            'total_airlines': self.queryset.values('airline').distinct().count(),
-            'today_fuel': float(self.queryset.filter(
-                transaction_date__date=today, status='completed'
-            ).aggregate(total=Sum('quantity'))['total'] or 0),
-            'weekly_fuel': float(self.queryset.filter(
-                transaction_date__date__gte=start_of_week, status='completed'
-            ).aggregate(total=Sum('quantity'))['total'] or 0),
-            'monthly_revenue': float(self.queryset.filter(
-                transaction_date__date__gte=start_of_month, status='completed'
-            ).aggregate(total=Sum('total_amount'))['total'] or 0),
-        }
-        
-        # Recent transactions
-        recent = self.queryset.order_by('-transaction_date')[:10]
-        stats['recent_transactions'] = FuelTransactionSerializer(recent, many=True).data
-        
-        # Weekly trend
-        weekly_trend = []
-        for i in range(6, -1, -1):
-            date = today - timedelta(days=i)
-            daily = self.queryset.filter(
-                transaction_date__date=date, status='completed'
-            ).aggregate(total=Sum('quantity'))['total'] or 0
-            weekly_trend.append({'date': date.strftime('%Y-%m-%d'), 'fuel': float(daily)})
-        
-        stats['weekly_trend'] = weekly_trend
-        
-        return Response(stats)
-    
     @action(detail=True, methods=['post'])
-    def cancel(self, request, pk=None):
+    def update_status(self, request, pk=None):
         transaction = self.get_object()
-        if transaction.status == 'cancelled':
-            return Response({'error': 'Transaction already cancelled'}, status=400)
+        new_status = request.data.get('status')
+        invoice_number = request.data.get('invoice_number', None)
         
-        # Restore fuel stock
-        transaction.airport.current_fuel_stock += transaction.quantity
-        transaction.airport.save()
+        if new_status not in dict(FuelTransaction.STATUS_CHOICES):
+            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
         
-        transaction.status = 'cancelled'
+        transaction.status = new_status
+        if invoice_number:
+            transaction.invoice_number = invoice_number
         transaction.save()
         
-        return Response({'message': 'Transaction cancelled successfully'})
+        return Response({
+            'status': transaction.status,
+            'message': f'Transaction status updated to {transaction.get_status_display()}'
+        })
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        total_transactions = self.queryset.count()
+        total_amount = self.queryset.aggregate(total=models.Sum('total_amount'))['total'] or 0
+        pending = self.queryset.filter(status='pending').count()
+        completed = self.queryset.filter(status='completed').count()
+        cancelled = self.queryset.filter(status='cancelled').count()
+        invoiced = self.queryset.filter(status='invoiced').count()
+        
+        return Response({
+            'total_transactions': total_transactions,
+            'total_amount': total_amount,
+            'pending': pending,
+            'completed': completed,
+            'cancelled': cancelled,
+            'invoiced': invoiced,
+        })

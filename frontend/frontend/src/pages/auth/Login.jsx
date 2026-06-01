@@ -13,11 +13,11 @@ import {
   InputAdornment,
   IconButton,
 } from '@mui/material';
-import { Visibility, VisibilityOff, Login as LoginIcon } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Login as LoginIcon, PersonAdd as RegisterIcon } from '@mui/icons-material';
 import { login } from '../../store/slices/authSlice';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -27,7 +27,8 @@ export default function Login() {
 
   const validate = () => {
     const newErrors = {};
-    if (!username.trim()) newErrors.username = 'Username is required';
+    if (!email.trim()) newErrors.email = 'Email is required';
+    if (!email.includes('@')) newErrors.email = 'Please enter a valid email';
     if (!password) newErrors.password = 'Password is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -37,10 +38,14 @@ export default function Login() {
     e.preventDefault();
     if (!validate()) return;
 
-    const result = await dispatch(login({ username, password }));
+    const result = await dispatch(login({ email, password }));
     if (!result.error) {
       navigate('/dashboard');
     }
+  };
+
+  const handleRegisterClick = () => {
+    navigate('/register');
   };
 
   return (
@@ -65,18 +70,19 @@ export default function Login() {
 
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
+              {typeof error === 'string' ? error : JSON.stringify(error)}
             </Alert>
           )}
 
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              error={!!errors.username}
-              helperText={errors.username}
+              label="Email Address"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={!!errors.email}
+              helperText={errors.email}
               margin="normal"
               autoFocus
             />
@@ -111,11 +117,35 @@ export default function Login() {
             >
               {isLoading ? <CircularProgress size={24} /> : <><LoginIcon sx={{ mr: 1 }} /> Login</>}
             </Button>
+
+            <Button
+              fullWidth
+              variant="outlined"
+              size="large"
+              onClick={handleRegisterClick}
+              sx={{ py: 1.5 }}
+              startIcon={<RegisterIcon />}
+            >
+              Create New Account
+            </Button>
+
+            <Box mt={2} textAlign="center">
+              <Typography variant="body2" color="textSecondary">
+                New to the platform?{' '}
+                <Button 
+                  color="primary" 
+                  onClick={handleRegisterClick}
+                  sx={{ textTransform: 'none', fontWeight: 'bold' }}
+                >
+                  Register here
+                </Button>
+              </Typography>
+            </Box>
           </form>
 
           <Box mt={3} textAlign="center">
             <Typography variant="caption" color="textSecondary">
-              Demo Credentials: admin / admin123
+              Demo Credentials: admin@example.com / admin123
             </Typography>
           </Box>
         </Paper>

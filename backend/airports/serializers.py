@@ -6,3 +6,9 @@ class AirportSerializer(serializers.ModelSerializer):
         model = Airport
         fields = '__all__'
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+class AirportCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Airport
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')

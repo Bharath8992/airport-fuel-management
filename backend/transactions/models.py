@@ -19,24 +19,24 @@ class FuelTransaction(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     transaction_number = models.CharField(max_length=50, unique=True)
-    supplier = models.ForeignKey('suppliers.Supplier', on_delete=models.PROTECT)
-    airline = models.ForeignKey('airlines.Airline', on_delete=models.PROTECT)
-    airport = models.ForeignKey('airports.Airport', on_delete=models.PROTECT)
+    supplier = models.ForeignKey('suppliers.Supplier', on_delete=models.PROTECT, related_name='transactions')
+    airline = models.ForeignKey('airlines.Airline', on_delete=models.PROTECT, related_name='transactions')
+    airport = models.ForeignKey('airports.Airport', on_delete=models.PROTECT, related_name='transactions')
     
     fuel_type = models.CharField(max_length=20, choices=FUEL_TYPES)
     quantity = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     price_per_liter = models.DecimalField(max_digits=10, decimal_places=2)
     
-    subtotal = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
     gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=18)
-    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
     
     transaction_date = models.DateTimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     invoice_number = models.CharField(max_length=50, null=True, blank=True)
     
-    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='transactions')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

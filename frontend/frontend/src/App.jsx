@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import Layout from './components/layouts/Layout';
 import PrivateRoute from './components/common/PrivateRoute';
 import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';  // Add this import
 import Dashboard from './pages/dashboard/Dashboard';
 import Suppliers from './pages/suppliers/Suppliers';
 import SupplierForm from './pages/suppliers/SupplierForm';
@@ -23,8 +24,11 @@ function App() {
 
   return (
     <Routes>
+      {/* Public routes - accessible only when not logged in */}
       <Route path="/login" element={!token ? <Login /> : <Navigate to="/dashboard" />} />
+      <Route path="/register" element={!token ? <Register /> : <Navigate to="/dashboard" />} />
       
+      {/* Protected routes - require authentication */}
       <Route element={<PrivateRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/dashboard" />} />
@@ -46,6 +50,9 @@ function App() {
           <Route path="/profile" element={<Profile />} />
         </Route>
       </Route>
+      
+      {/* Catch all - redirect to login or dashboard based on auth state */}
+      <Route path="*" element={<Navigate to={token ? "/dashboard" : "/login"} />} />
     </Routes>
   );
 }

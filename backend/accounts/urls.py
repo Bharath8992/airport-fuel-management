@@ -1,7 +1,17 @@
 from django.urls import path
-from . import views
+from .views import (
+    RegisterView, LoginView, ProfileView, 
+    ChangePasswordView, LogoutView, CreateAdminView,
+    VerifyOTPView, ResendOTPView
+)
 
-# Temporary empty urls to avoid errors
 urlpatterns = [
-    # We'll add actual URLs later
+    path('register/', RegisterView.as_view(), name='register'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
+    path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('profile/', ProfileView.as_view(), name='profile'),
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('create-admin/', CreateAdminView.as_view(), name='create-admin'),
 ]
