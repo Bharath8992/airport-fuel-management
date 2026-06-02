@@ -1,0 +1,250 @@
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgwMzk0ODU4LCJpYXQiOjE3ODAzOTEyNTgsImp0aSI6IjBmMzQxOWEwNmYwYjQ4OWNiYmI0YzhlZTFmY2Q3ZmMzIiwidXNlcl9pZCI6IjExMzVhNTcyLTI0NDMtNGNjNi1iNTU5LWE1NmE5ODBiNGJjYiJ9.3pj7daDi-1hHp6VtetkpqA4-P0XI-iIm_hxaBlhUC7Q
+
+
+Register User
+
+POST http://localhost:8000/api/auth/register/
+Content-Type: application/json
+
+{
+    "username": "testsupplier",
+    "email": "supplier@example.com",
+    "password": "Test@123456",
+    "role": "supplier",
+    "phone_number": "9876543210",
+    "company_name": "Test Fuel Supplies"
+}
+
+
+
+Login
+
+
+POST http://localhost:8000/api/auth/login/
+Content-Type: application/json
+
+{
+    "email": "supplier@example.com",
+    "password": "Test@123456"
+}
+
+Verify OTP
+
+POST http://localhost:8000/api/auth/verify-otp/
+Content-Type: application/json
+
+{
+    "email": "supplier@example.com",
+    "otp_code": "123456"
+}
+
+
+
+2. Supplier Management (Suppliers App)
+
+POST http://localhost:8000/api/suppliers/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "company_name": "Bharat Petroleum",
+    "contact_person": "Rajesh Kumar",
+    "email": "contact@bharatpetroleum.com",
+    "phone": "9876543210",
+    "address": "Mumbai, India",
+    "gst_number": "22AAAAA0000A1Z",
+    "fuel_types": ["Jet A-1", "Avgas"],
+    "status": true
+}
+
+
+
+GET http://localhost:8000/api/suppliers/?page=1&page_size=10&search=bharat&status=true
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+
+GET http://localhost:8000/api/suppliers/{supplier_id}/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+PUT http://localhost:8000/api/suppliers/{supplier_id}/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "company_name": "Bharat Petroleum Ltd",
+    "contact_person": "Rajesh Kumar Sharma",
+    "email": "contact@bharatpetroleum.com",
+    "phone": "9876543210",
+    "address": "Mumbai, Maharashtra, India",
+    "gst_number": "22AAAAA0000A1Z",
+    "fuel_types": ["Jet A-1", "Avgas", "Jet B"],
+    "status": true
+}
+
+
+
+
+DELETE http://localhost:8000/api/suppliers/{supplier_id}/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+
+POST http://localhost:8000/api/suppliers/{supplier_id}/toggle_status/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+GET http://localhost:8000/api/suppliers/stats/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+3. Airline Management (Airlines App)
+
+POST http://localhost:8000/api/airlines/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "airline_name": "IndiGo Airlines",
+    "airline_code": "6E",
+    "contact_person": "Rahul Mehta",
+    "email": "operations@indigo.com",
+    "phone": "9876543210",
+    "address": "Gurugram, India",
+    "credit_limit": 5000000,
+    "payment_terms": 30,
+    "status": true
+}
+
+
+GET http://localhost:8000/api/airlines/?search=indigo&status=true
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+
+
+PUT http://localhost:8000/api/airlines/{airline_id}/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "airline_name": "IndiGo Airlines",
+    "airline_code": "6E",
+    "contact_person": "Rahul Mehta",
+    "email": "operations@indigo.com",
+    "phone": "9876543210",
+    "address": "Gurugram, Haryana, India",
+    "credit_limit": 7500000,
+    "payment_terms": 45,
+    "status": true
+}
+
+
+
+
+POST http://localhost:8000/api/airlines/{airline_id}/toggle_status/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+4. Airport Management (Airports App)
+
+
+
+POST http://localhost:8000/api/airports/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "airport_name": "Indira Gandhi International Airport",
+    "airport_code": "DEL",
+    "city": "New Delhi",
+    "country": "India",
+    "runway_count": 3,
+    "fuel_storage_capacity": 5000000,
+    "current_fuel_stock": 2500000,
+    "status": true
+}
+
+
+GET http://localhost:8000/api/airports/?search=delhi&status=true
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+POST http://localhost:8000/api/airports/{airport_id}/update_fuel_stock/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "current_fuel_stock": 3000000
+}
+
+
+
+
+
+GET http://localhost:8000/api/airports/low_fuel_alerts/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+
+5. Fuel Transaction Management (Transactions App)
+
+
+
+
+POST http://localhost:8000/api/transactions/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "supplier": "supplier-uuid",
+    "airline": "airline-uuid",
+    "airport": "airport-uuid",
+    "fuel_type": "JET_A1",
+    "quantity": 10000,
+    "price_per_liter": 85.50,
+    "gst_rate": 18,
+    "transaction_date": "2026-06-02T10:30:00Z",
+    "status": "pending"
+}
+
+
+
+GET http://localhost:8000/api/transactions/?status=completed&fuel_type=JET_A1&ordering=-transaction_date
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+
+POST http://localhost:8000/api/transactions/{transaction_id}/update_status/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+    "status": "completed"
+}
+
+
+
+
+
+POST http://localhost:8000/api/transactions/{transaction_id}/generate_invoice/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+GET http://localhost:8000/api/transactions/stats/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+6. Dashboard APIs
+
+GET http://localhost:8000/api/dashboard/stats/?period=weekly
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+GET http://localhost:8000/api/dashboard/fuel-trends/?period=monthly
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+
+GET http://localhost:8000/api/dashboard/recent-activities/?limit=10
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
