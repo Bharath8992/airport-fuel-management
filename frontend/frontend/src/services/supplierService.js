@@ -14,6 +14,7 @@ class SupplierService {
         ...params.filters
       }
     });
+    // Return the full response data
     return response.data;
   }
 
@@ -44,7 +45,7 @@ class SupplierService {
 
   // Additional Actions
   async toggleStatus(id) {
-    const response = await api.post(`/suppliers/${id}/toggle_status/`);
+    const response = await api.post(`/suppliers/${id}/toggle-status/`);
     return response.data;
   }
 
@@ -72,24 +73,6 @@ class SupplierService {
 
   async bulkDelete(ids) {
     const response = await api.delete('/suppliers/bulk_delete/', { data: { ids } });
-    return response.data;
-  }
-
-  // Export/Import
-  async exportSuppliers(params = {}) {
-    const response = await api.get('/suppliers/export/', { 
-      params,
-      responseType: 'blob' 
-    });
-    return response.data;
-  }
-
-  async importSuppliers(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await api.post('/suppliers/import/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
     return response.data;
   }
 }

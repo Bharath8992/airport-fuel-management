@@ -64,6 +64,24 @@ import {
 
 const FUEL_TYPES = ['Jet A-1', 'Avgas', 'Jet Fuel', 'Aviation Gasoline'];
 
+
+// In the loadSuppliers function, add console.log
+const loadSuppliers = () => {
+  const params = {
+    page: page + 1,
+    page_size: rowsPerPage,
+    search: searchTerm,
+    ...(statusFilter !== 'all' && { status: statusFilter === 'active' }),
+  };
+  console.log('Fetching suppliers with params:', params);
+  dispatch(fetchSuppliers(params)).then((result) => {
+    console.log('Fetched suppliers result:', result);
+    if (result.payload) {
+      console.log('Suppliers data:', result.payload);
+    }
+  });
+};
+
 // Supplier Form Dialog Component
 const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
   const [formData, setFormData] = useState({
@@ -106,9 +124,18 @@ const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
   }, [supplier, open]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+    
+    // Special handling for GST number - convert to uppercase
+    if (name === 'gst_number') {
+      setFormData({ ...formData, [name]: value.toUpperCase() });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+    
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
     }
   };
 
@@ -116,24 +143,66 @@ const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
     const value = event.target.value;
     const fuelTypes = Array.isArray(value) ? value : [value];
     setFormData({ ...formData, fuel_types: fuelTypes });
+    if (errors.fuel_types) {
+      setErrors({ ...errors, fuel_types: '' });
+    }
+  };
+
+  const validateGST = (gst) => {
+    // GST format: 2 digits, 5 chars, 4 digits, 1 char, 1 digit, 1 char
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9]{1}[Z]{1}[A-Z0-9]{1}$/;
+    return gstRegex.test(gst);
   };
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.company_name.trim()) newErrors.company_name = 'Company name is required';
-    if (!formData.contact_person.trim()) newErrors.contact_person = 'Contact person is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone is required';
-    if (!formData.gst_number.trim()) newErrors.gst_number = 'GST number is required';
-    if (!formData.fuel_types || formData.fuel_types.length === 0) newErrors.fuel_types = 'Select at least one fuel type';
+    
+    if (!formData.company_name?.trim()) {
+      newErrors.company_name = 'Company name is required';
+    }
+    
+    if (!formData.contact_person?.trim()) {
+      newErrors.contact_person = 'Contact person is required';
+    }
+    
+    if (!formData.email?.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.phone?.trim()) {
+      newErrors.phone = 'Phone is required';
+    } else if (!formData.phone.match(/^\d+$/)) {
+      newErrors.phone = 'Phone must contain only digits';
+    }
+    
+    if (!formData.gst_number?.trim()) {
+      newErrors.gst_number = 'GST number is required';
+    } else if (formData.gst_number.length !== 15) {
+      newErrors.gst_number = 'GST number must be 15 characters long';
+    } else if (!validateGST(formData.gst_number)) {
+      newErrors.gst_number = 'Invalid GST number format (e.g., 22AAAAA0000A1Z)';
+    }
+    
+    if (!formData.fuel_types || formData.fuel_types.length === 0) {
+      newErrors.fuel_types = 'Select at least one fuel type';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
     if (validate()) {
-      onSave(formData);
+      // Clean up data before sending
+      const submitData = {
+        ...formData,
+        gst_number: formData.gst_number.toUpperCase(),
+        address: formData.address || '', // Ensure address is at least empty string
+        phone: String(formData.phone), // Ensure phone is string
+      };
+      onSave(submitData);
     }
   };
 
@@ -203,6 +272,7 @@ const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
               helperText={errors.phone}
               size="small"
               required
+              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12}>
@@ -214,7 +284,10 @@ const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
               rows={2}
               value={formData.address}
               onChange={handleChange}
+              error={!!errors.address}
+              helperText={errors.address}
               size="small"
+              placeholder="Enter complete address"
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -225,13 +298,15 @@ const SupplierFormDialog = ({ open, supplier, onClose, onSave, loading }) => {
               value={formData.gst_number}
               onChange={handleChange}
               error={!!errors.gst_number}
-              helperText={errors.gst_number}
+              helperText={errors.gst_number || 'Format: 22AAAAA0000A1Z (15 characters)'}
               size="small"
               required
+              placeholder="22AAAAA0000A1Z"
+              inputProps={{ maxLength: 15, style: { textTransform: 'uppercase' } }}
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <FormControl fullWidth size="small" error={!!errors.fuel_types}>
+            <FormControl fullWidth size="small" error={!!errors.fuel_types} required>
               <InputLabel>Fuel Types</InputLabel>
               <Select
                 multiple
@@ -337,11 +412,11 @@ const ViewSupplierDialog = ({ open, supplier, onClose }) => {
             </Grid>
             <Grid item xs={12}>
               <Typography variant="subtitle2" color="text.secondary">Address</Typography>
-              <Typography variant="body1">{supplier.address}</Typography>
+              <Typography variant="body1">{supplier.address || 'Not provided'}</Typography>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" color="text.secondary">GST Number</Typography>
-              <Typography variant="body1">{supplier.gst_number}</Typography>
+              <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>{supplier.gst_number}</Typography>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" color="text.secondary">Fuel Types</Typography>
@@ -450,7 +525,9 @@ export default function Suppliers() {
       handleCloseDialog();
       loadSuppliers();
     } catch (err) {
-      showSnackbar(err?.message || 'Operation failed', 'error');
+      console.error('Save error:', err);
+      const errorMessage = err?.message || err?.errors || 'Operation failed';
+      showSnackbar(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage), 'error');
     } finally {
       setFormLoading(false);
     }
@@ -465,6 +542,7 @@ export default function Suppliers() {
       setDeleteConfirm(null);
       loadSuppliers();
     } catch (err) {
+      console.error('Delete error:', err);
       showSnackbar(err?.message || 'Delete failed', 'error');
     } finally {
       setDeleteLoading(false);
@@ -477,6 +555,7 @@ export default function Suppliers() {
       showSnackbar(`Supplier ${currentStatus ? 'deactivated' : 'activated'} successfully!`, 'success');
       loadSuppliers();
     } catch (err) {
+      console.error('Toggle status error:', err);
       showSnackbar(err?.message || 'Status update failed', 'error');
     }
   };
@@ -668,7 +747,7 @@ export default function Suppliers() {
                       </Typography>
                     </TableCell>
                     {!isTablet && <TableCell>{supplier.phone}</TableCell>}
-                    {!isMobile && <TableCell>{supplier.gst_number}</TableCell>}
+                    {!isMobile && <TableCell sx={{ textTransform: 'uppercase' }}>{supplier.gst_number}</TableCell>}
                     <TableCell>
                       <Stack direction="row" spacing={0.5} flexWrap="wrap">
                         {Array.isArray(supplier.fuel_types) && supplier.fuel_types.slice(0, isMobile ? 1 : 2).map((type, idx) => (

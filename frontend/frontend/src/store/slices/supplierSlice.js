@@ -200,13 +200,27 @@ const supplierSlice = createSlice({
       })
       .addCase(fetchSuppliers.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.suppliers = action.payload.results || [];
-        state.total = action.payload.count || 0;
+        // Handle different response structures
+        if (action.payload && Array.isArray(action.payload)) {
+          state.suppliers = action.payload;
+          state.total = action.payload.length;
+        } else if (action.payload && action.payload.results) {
+          state.suppliers = action.payload.results;
+          state.total = action.payload.count || 0;
+        } else if (action.payload && action.payload.data) {
+          state.suppliers = action.payload.data;
+          state.total = action.payload.data.length;
+        } else {
+          state.suppliers = [];
+          state.total = 0;
+        }
         state.pagination.totalPages = Math.ceil(state.total / state.pagination.pageSize);
       })
       .addCase(fetchSuppliers.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+        state.suppliers = [];
+        state.total = 0;
       })
       
       // Fetch Single Supplier
@@ -220,10 +234,14 @@ const supplierSlice = createSlice({
       })
       .addCase(createSupplier.fulfilled, (state, action) => {
         state.isSubmitting = false;
-        state.suppliers.unshift(action.payload);
+        // Add the new supplier to the list
+        const newSupplier = action.payload.data || action.payload;
+        state.suppliers = [newSupplier, ...state.suppliers];
         state.total += 1;
-        if (action.payload.status) {
+        if (newSupplier.status) {
           state.stats.active += 1;
+        } else {
+          state.stats.inactive += 1;
         }
         state.stats.total += 1;
       })
@@ -234,10 +252,11 @@ const supplierSlice = createSlice({
       
       // Update Supplier
       .addCase(updateSupplier.fulfilled, (state, action) => {
-        const index = state.suppliers.findIndex(s => s.id === action.payload.id);
+        const updatedSupplier = action.payload.data || action.payload;
+        const index = state.suppliers.findIndex(s => s.id === updatedSupplier.id);
         if (index !== -1) {
           const oldStatus = state.suppliers[index].status;
-          const newStatus = action.payload.status;
+          const newStatus = updatedSupplier.status;
           
           if (oldStatus !== newStatus) {
             if (newStatus) {
@@ -249,10 +268,10 @@ const supplierSlice = createSlice({
             }
           }
           
-          state.suppliers[index] = action.payload;
+          state.suppliers[index] = updatedSupplier;
         }
-        if (state.selectedSupplier?.id === action.payload.id) {
-          state.selectedSupplier = action.payload;
+        if (state.selectedSupplier?.id === updatedSupplier.id) {
+          state.selectedSupplier = updatedSupplier;
         }
       })
       

@@ -1,4 +1,6 @@
+// Airports.jsx
 import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Box,
   Paper,
@@ -52,7 +54,17 @@ import {
   Clear as ClearIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
+import {
+  fetchAirports,
+  createAirport,
+  updateAirport,
+  deleteAirport,
+  toggleAirportStatus,
+  updateAirportFuelStock,
+  clearError,
+} from '../../store/slices/airportSlice';
 
 // Airport Form Dialog Component
 const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
@@ -93,27 +105,50 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
   }, [airport, open]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+    
+    if (name === 'airport_code') {
+      setFormData({ ...formData, [name]: value.toUpperCase() });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+    
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
     }
   };
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.airport_name.trim()) newErrors.airport_name = 'Airport name is required';
-    if (!formData.airport_code.trim()) newErrors.airport_code = 'Airport code is required';
-    if (formData.airport_code.length < 3) newErrors.airport_code = 'Airport code must be at least 3 characters';
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.country.trim()) newErrors.country = 'Country is required';
-    if (!formData.fuel_storage_capacity) newErrors.fuel_storage_capacity = 'Fuel storage capacity is required';
+    if (!formData.airport_name?.trim()) newErrors.airport_name = 'Airport name is required';
+    if (!formData.airport_code?.trim()) newErrors.airport_code = 'Airport code is required';
+    if (formData.airport_code.length < 3 || formData.airport_code.length > 4) {
+      newErrors.airport_code = 'Airport code must be 3 or 4 characters';
+    }
+    if (!formData.city?.trim()) newErrors.city = 'City is required';
+    if (!formData.country?.trim()) newErrors.country = 'Country is required';
+    if (!formData.fuel_storage_capacity) {
+      newErrors.fuel_storage_capacity = 'Fuel storage capacity is required';
+    } else if (formData.fuel_storage_capacity <= 0) {
+      newErrors.fuel_storage_capacity = 'Capacity must be greater than 0';
+    }
+    if (formData.current_fuel_stock > formData.fuel_storage_capacity) {
+      newErrors.current_fuel_stock = 'Current stock cannot exceed capacity';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
     if (validate()) {
-      onSave(formData);
+      const submitData = {
+        ...formData,
+        runway_count: parseInt(formData.runway_count) || 1,
+        fuel_storage_capacity: parseFloat(formData.fuel_storage_capacity),
+        current_fuel_stock: parseFloat(formData.current_fuel_stock) || 0,
+      };
+      onSave(submitData);
     }
   };
 
@@ -142,6 +177,7 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               error={!!errors.airport_name}
               helperText={errors.airport_name}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -154,7 +190,8 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               error={!!errors.airport_code}
               helperText={errors.airport_code}
               size="small"
-              inputProps={{ style: { textTransform: 'uppercase' } }}
+              required
+              inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -167,6 +204,7 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               error={!!errors.city}
               helperText={errors.city}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -179,6 +217,7 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               error={!!errors.country}
               helperText={errors.country}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -190,6 +229,7 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               value={formData.runway_count}
               onChange={handleChange}
               size="small"
+              inputProps={{ min: 0 }}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -203,6 +243,7 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               error={!!errors.fuel_storage_capacity}
               helperText={errors.fuel_storage_capacity}
               size="small"
+              required
               InputProps={{ startAdornment: <InputAdornment position="start">L</InputAdornment> }}
             />
           </Grid>
@@ -214,6 +255,8 @@ const AirportFormDialog = ({ open, airport, onClose, onSave, loading }) => {
               type="number"
               value={formData.current_fuel_stock}
               onChange={handleChange}
+              error={!!errors.current_fuel_stock}
+              helperText={errors.current_fuel_stock}
               size="small"
               InputProps={{ startAdornment: <InputAdornment position="start">L</InputAdornment> }}
             />
@@ -241,7 +284,15 @@ const StockUpdateDialog = ({ open, airport, onClose, onUpdate, loading }) => {
       setError('Please enter a valid quantity');
       return;
     }
-    onUpdate(airport.id, parseFloat(quantity), operation);
+    
+    let newStock = airport.current_fuel_stock;
+    if (operation === 'add') {
+      newStock = Math.min(airport.current_fuel_stock + parseFloat(quantity), airport.fuel_storage_capacity);
+    } else {
+      newStock = Math.max(airport.current_fuel_stock - parseFloat(quantity), 0);
+    }
+    
+    onUpdate(airport.id, newStock);
   };
 
   return (
@@ -304,6 +355,16 @@ const StockUpdateDialog = ({ open, airport, onClose, onUpdate, loading }) => {
               <Typography variant="body2" color="text.secondary">
                 Capacity: <strong>{airport?.fuel_storage_capacity?.toLocaleString()} L</strong>
               </Typography>
+              {operation === 'add' && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  New Stock: <strong>{Math.min((airport?.current_fuel_stock || 0) + (parseFloat(quantity) || 0), airport?.fuel_storage_capacity || 0).toLocaleString()} L</strong>
+                </Typography>
+              )}
+              {operation === 'subtract' && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  New Stock: <strong>{Math.max((airport?.current_fuel_stock || 0) - (parseFloat(quantity) || 0), 0).toLocaleString()} L</strong>
+                </Typography>
+              )}
             </Paper>
           </Grid>
         </Grid>
@@ -323,137 +384,155 @@ const StockUpdateDialog = ({ open, airport, onClose, onUpdate, loading }) => {
   );
 };
 
+// View Airport Dialog
+const ViewAirportDialog = ({ open, airport, onClose }) => {
+  const getStockPercentage = (current, capacity) => {
+    return ((current / capacity) * 100).toFixed(1);
+  };
+
+  const formatNumber = (num) => {
+    return num?.toLocaleString() || 0;
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ bgcolor: '#1976d2', color: 'white' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <AirportIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Airport Details
+          </Box>
+          <IconButton onClick={onClose} sx={{ color: 'white' }}>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        {airport && (
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Airport Name</Typography>
+              <Typography variant="body1" fontWeight="medium">{airport.airport_name}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Airport Code</Typography>
+              <Chip label={airport.airport_code} size="small" />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Location</Typography>
+              <Typography variant="body1">{airport.city}, {airport.country}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Runways</Typography>
+              <Typography variant="body1">{airport.runway_count}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+              <Chip
+                label={airport.status ? 'Active' : 'Inactive'}
+                color={airport.status ? 'success' : 'error'}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Fuel Storage</Typography>
+              <Paper sx={{ p: 2, mt: 1, bgcolor: '#f5f5f5' }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Capacity</Typography>
+                    <Typography variant="h6">{formatNumber(airport.fuel_storage_capacity)} L</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Current Stock</Typography>
+                    <Typography variant="h6" color={airport.current_fuel_stock < airport.fuel_storage_capacity * 0.2 ? 'error' : 'primary'}>
+                      {formatNumber(airport.current_fuel_stock)} L
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={getStockPercentage(airport.current_fuel_stock, airport.fuel_storage_capacity)} 
+                      sx={{ height: 8, borderRadius: 4 }}
+                      color={airport.current_fuel_stock / airport.fuel_storage_capacity > 0.7 ? 'success' : 'warning'}
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      {getStockPercentage(airport.current_fuel_stock, airport.fuel_storage_capacity)}% Full
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Created At</Typography>
+              <Typography variant="body2">{new Date(airport.created_at).toLocaleString()}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Last Updated</Typography>
+              <Typography variant="body2">{new Date(airport.updated_at).toLocaleString()}</Typography>
+            </Grid>
+          </Grid>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // Main Airports Component
 export default function Airports() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-
-  const [airports, setAirports] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  const dispatch = useDispatch();
+  const { airports, total, isLoading, error } = useSelector((state) => state.airports);
+  
+  // Local state
   const [openDialog, setOpenDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
   const [openStockDialog, setOpenStockDialog] = useState(false);
   const [selectedAirport, setSelectedAirport] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [stockLoading, setStockLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Load airports from localStorage
+  // Load airports on mount and when filters change
   useEffect(() => {
     loadAirports();
-  }, []);
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
 
   const loadAirports = () => {
-    setLoading(true);
-    const savedAirports = localStorage.getItem('airports');
-    if (savedAirports) {
-      setAirports(JSON.parse(savedAirports));
-    } else {
-      const defaultAirports = [
-        {
-          id: 1,
-          airport_name: 'Indira Gandhi International Airport',
-          airport_code: 'DEL',
-          city: 'New Delhi',
-          country: 'India',
-          runway_count: 3,
-          fuel_storage_capacity: 5000000,
-          current_fuel_stock: 2500000,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          airport_name: 'Chhatrapati Shivaji International Airport',
-          airport_code: 'BOM',
-          city: 'Mumbai',
-          country: 'India',
-          runway_count: 2,
-          fuel_storage_capacity: 4000000,
-          current_fuel_stock: 1800000,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 3,
-          airport_name: 'Kempegowda International Airport',
-          airport_code: 'BLR',
-          city: 'Bangalore',
-          country: 'India',
-          runway_count: 2,
-          fuel_storage_capacity: 3000000,
-          current_fuel_stock: 1200000,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 4,
-          airport_name: 'Chennai International Airport',
-          airport_code: 'MAA',
-          city: 'Chennai',
-          country: 'India',
-          runway_count: 2,
-          fuel_storage_capacity: 3500000,
-          current_fuel_stock: 1500000,
-          status: false,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      setAirports(defaultAirports);
-      localStorage.setItem('airports', JSON.stringify(defaultAirports));
-    }
-    setLoading(false);
+    const params = {
+      page: page + 1,
+      page_size: rowsPerPage,
+      search: searchTerm,
+      ...(statusFilter !== 'all' && { status: statusFilter === 'active' }),
+      ordering: '-created_at',
+    };
+    dispatch(fetchAirports(params));
   };
 
-  // Save to localStorage
-  useEffect(() => {
-    if (airports.length > 0) {
-      localStorage.setItem('airports', JSON.stringify(airports));
-    }
-  }, [airports]);
-
-  // Filter airports
-  useEffect(() => {
-    let filtered = [...airports];
-
-    if (searchTerm) {
-      filtered = filtered.filter(a =>
-        a.airport_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.airport_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.country.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(a =>
-        statusFilter === 'active' ? a.status : !a.status
-      );
-    }
-
-    setFilteredData(filtered);
-    setPage(0);
-  }, [airports, searchTerm, statusFilter]);
-
+  // Update rows per page on screen resize
   useEffect(() => {
     setRowsPerPage(isMobile ? 5 : 10);
   }, [isMobile]);
 
+  // Calculate stats from actual data
   const stats = {
-    total: airports.length,
+    total: total,
     active: airports.filter(a => a.status).length,
     inactive: airports.filter(a => !a.status).length,
     totalCapacity: airports.reduce((sum, a) => sum + (a.fuel_storage_capacity || 0), 0),
     totalStock: airports.reduce((sum, a) => sum + (a.current_fuel_stock || 0), 0),
   };
-
-  const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const handleOpenDialog = (airport = null) => {
     setSelectedAirport(airport);
@@ -463,6 +542,11 @@ export default function Airports() {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedAirport(null);
+  };
+
+  const handleOpenViewDialog = (airport) => {
+    setSelectedAirport(airport);
+    setOpenViewDialog(true);
   };
 
   const handleOpenStockDialog = (airport) => {
@@ -475,85 +559,80 @@ export default function Airports() {
     setSelectedAirport(null);
   };
 
-  const handleSaveAirport = (formData) => {
+  const handleSaveAirport = async (formData) => {
     setFormLoading(true);
-    
-    setTimeout(() => {
+    try {
       if (selectedAirport) {
-        const updatedAirports = airports.map(a =>
-          a.id === selectedAirport.id 
-            ? { ...a, ...formData, updated_at: new Date().toISOString() }
-            : a
-        );
-        setAirports(updatedAirports);
-        setSnackbar({ open: true, message: 'Airport updated successfully!', severity: 'success' });
+        await dispatch(updateAirport({ id: selectedAirport.id, data: formData })).unwrap();
+        showSnackbar('Airport updated successfully!', 'success');
       } else {
-        const newAirport = {
-          id: Date.now(),
-          ...formData,
-          status: true,
-          created_at: new Date().toISOString(),
-        };
-        setAirports([newAirport, ...airports]);
-        setSnackbar({ open: true, message: 'Airport created successfully!', severity: 'success' });
+        await dispatch(createAirport(formData)).unwrap();
+        showSnackbar('Airport created successfully!', 'success');
       }
-      setFormLoading(false);
       handleCloseDialog();
-    }, 500);
-  };
-
-  const handleUpdateStock = (id, quantity, operation) => {
-    setStockLoading(true);
-    
-    setTimeout(() => {
-      const updatedAirports = airports.map(a => {
-        if (a.id === id) {
-          let newStock = a.current_fuel_stock;
-          if (operation === 'add') {
-            newStock = Math.min(a.current_fuel_stock + quantity, a.fuel_storage_capacity);
-          } else {
-            newStock = Math.max(a.current_fuel_stock - quantity, 0);
-          }
-          return { ...a, current_fuel_stock: newStock };
-        }
-        return a;
-      });
-      setAirports(updatedAirports);
-      setSnackbar({ 
-        open: true, 
-        message: `Fuel ${operation === 'add' ? 'added' : 'removed'} successfully!`, 
-        severity: 'success' 
-      });
-      setStockLoading(false);
-      handleCloseStockDialog();
-    }, 500);
-  };
-
-  const handleDeleteAirport = () => {
-    if (deleteConfirm) {
-      setAirports(airports.filter(a => a.id !== deleteConfirm.id));
-      setSnackbar({ open: true, message: 'Airport deleted successfully!', severity: 'success' });
-      setDeleteConfirm(null);
+      loadAirports();
+    } catch (err) {
+      console.error('Save error:', err);
+      const errorMessage = err?.message || err?.errors || 'Operation failed';
+      showSnackbar(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage), 'error');
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  const handleToggleStatus = (id) => {
-    const updatedAirports = airports.map(a =>
-      a.id === id ? { ...a, status: !a.status } : a
-    );
-    setAirports(updatedAirports);
-    
-    const airport = airports.find(a => a.id === id);
-    setSnackbar({
-      open: true,
-      message: `Airport ${airport?.status ? 'deactivated' : 'activated'} successfully!`,
-      severity: 'success',
-    });
+  const handleUpdateStock = async (id, newStock) => {
+    setStockLoading(true);
+    try {
+      await dispatch(updateAirportFuelStock({ id, current_fuel_stock: newStock })).unwrap();
+      showSnackbar('Fuel stock updated successfully!', 'success');
+      handleCloseStockDialog();
+      loadAirports();
+    } catch (err) {
+      console.error('Stock update error:', err);
+      showSnackbar(err?.message || 'Stock update failed', 'error');
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  const handleDeleteAirport = async () => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    try {
+      await dispatch(deleteAirport(deleteConfirm.id)).unwrap();
+      showSnackbar('Airport deleted successfully!', 'success');
+      setDeleteConfirm(null);
+      loadAirports();
+    } catch (err) {
+      console.error('Delete error:', err);
+      showSnackbar(err?.message || 'Delete failed', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      await dispatch(toggleAirportStatus(id)).unwrap();
+      showSnackbar(`Airport ${currentStatus ? 'deactivated' : 'activated'} successfully!`, 'success');
+      loadAirports();
+    } catch (err) {
+      console.error('Toggle status error:', err);
+      showSnackbar(err?.message || 'Status update failed', 'error');
+    }
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
+    setPage(0);
+  };
+
+  const showSnackbar = (message, severity) => {
+    setSnackbar({ open: true, message, severity });
+    setTimeout(() => {
+      dispatch(clearError());
+    }, 3000);
   };
 
   const getStatusChip = (status) => {
@@ -584,7 +663,7 @@ export default function Airports() {
     return num?.toLocaleString() || 0;
   };
 
-  if (loading) {
+  if (isLoading && airports.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <CircularProgress />
@@ -672,6 +751,13 @@ export default function Airports() {
         </Grid>
       </Grid>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => dispatch(clearError())}>
+          {typeof error === 'string' ? error : JSON.stringify(error)}
+        </Alert>
+      )}
+
       {/* Actions Bar */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -732,14 +818,14 @@ export default function Airports() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedData.length === 0 ? (
+              {airports.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isMobile ? 5 : 7} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={isMobile ? 6 : 7} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">No airports found</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedData.map((airport) => {
+                airports.map((airport) => {
                   const stockPercentage = getStockPercentage(airport.current_fuel_stock, airport.fuel_storage_capacity);
                   return (
                     <TableRow key={airport.id} hover>
@@ -758,7 +844,6 @@ export default function Airports() {
                       </TableCell>
                       <TableCell>
                         {!isTablet ? `${airport.city}, ${airport.country}` : null}
-                        {isTablet && null}
                       </TableCell>
                       {!isTablet && <TableCell>{airport.runway_count}</TableCell>}
                       <TableCell sx={{ minWidth: 150 }}>
@@ -777,6 +862,11 @@ export default function Airports() {
                       <TableCell>{getStatusChip(airport.status)}</TableCell>
                       <TableCell align="center">
                         <Stack direction="row" spacing={0.5} justifyContent="center">
+                          <Tooltip title="View Details">
+                            <IconButton size="small" color="info" onClick={() => handleOpenViewDialog(airport)}>
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Update Fuel Stock">
                             <IconButton size="small" color="warning" onClick={() => handleOpenStockDialog(airport)}>
                               <FuelIcon fontSize="small" />
@@ -791,7 +881,7 @@ export default function Airports() {
                             <IconButton
                               size="small"
                               color={airport.status ? 'warning' : 'success'}
-                              onClick={() => handleToggleStatus(airport.id)}
+                              onClick={() => handleToggleStatus(airport.id, airport.status)}
                             >
                               {airport.status ? <CancelIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                             </IconButton>
@@ -820,7 +910,7 @@ export default function Airports() {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
-          count={filteredData.length}
+          count={total}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
@@ -838,6 +928,13 @@ export default function Airports() {
         onClose={handleCloseDialog}
         onSave={handleSaveAirport}
         loading={formLoading}
+      />
+
+      {/* View Airport Dialog */}
+      <ViewAirportDialog
+        open={openViewDialog}
+        airport={selectedAirport}
+        onClose={() => setOpenViewDialog(false)}
       />
 
       {/* Stock Update Dialog */}
@@ -864,8 +961,8 @@ export default function Airports() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-          <Button onClick={handleDeleteAirport} color="error" variant="contained">
-            Delete
+          <Button onClick={handleDeleteAirport} color="error" variant="contained" disabled={deleteLoading}>
+            {deleteLoading ? <CircularProgress size={24} /> : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

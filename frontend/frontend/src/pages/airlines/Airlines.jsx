@@ -1,4 +1,10 @@
+// Airlines.jsx
 import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  
+  Visibility as VisibilityIcon,  
+} from '@mui/icons-material';
 import {
   Box,
   Paper,
@@ -42,7 +48,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  Close as CloseIcon,  // Add this line
+  Close as CloseIcon,
   Business as BusinessIcon,
   Person as PersonIcon,
   Email as EmailIcon,
@@ -53,6 +59,14 @@ import {
   Flight as FlightIcon,
   CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
+import {
+  fetchAirlines,
+  createAirline,
+  updateAirline,
+  deleteAirline,
+  toggleAirlineStatus,
+  clearError,
+} from '../../store/slices/airlineSlice';
 
 // Airline Form Dialog Component
 const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
@@ -96,28 +110,71 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
   }, [airline, open]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+    
+    // Convert airline code to uppercase
+    if (name === 'airline_code') {
+      setFormData({ ...formData, [name]: value.toUpperCase() });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+    
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
     }
   };
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.airline_name.trim()) newErrors.airline_name = 'Airline name is required';
-    if (!formData.airline_code.trim()) newErrors.airline_code = 'Airline code is required';
-    if (formData.airline_code.length !== 3) newErrors.airline_code = 'Airline code must be 3 characters';
-    if (!formData.contact_person.trim()) newErrors.contact_person = 'Contact person is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone is required';
+    
+    if (!formData.airline_name?.trim()) {
+      newErrors.airline_name = 'Airline name is required';
+    }
+    
+    if (!formData.airline_code?.trim()) {
+      newErrors.airline_code = 'Airline code is required';
+    } else if (formData.airline_code.length !== 3) {
+      newErrors.airline_code = 'Airline code must be exactly 3 characters';
+    } else if (!/^[A-Z]{3}$/.test(formData.airline_code)) {
+      newErrors.airline_code = 'Airline code must contain only letters';
+    }
+    
+    if (!formData.contact_person?.trim()) {
+      newErrors.contact_person = 'Contact person is required';
+    }
+    
+    if (!formData.email?.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.phone?.trim()) {
+      newErrors.phone = 'Phone is required';
+    } else if (!formData.phone.match(/^\d+$/)) {
+      newErrors.phone = 'Phone must contain only digits';
+    }
+    
+    if (formData.credit_limit && formData.credit_limit < 0) {
+      newErrors.credit_limit = 'Credit limit cannot be negative';
+    }
+    
+    if (formData.payment_terms && formData.payment_terms < 0) {
+      newErrors.payment_terms = 'Payment terms cannot be negative';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
     if (validate()) {
-      onSave(formData);
+      const submitData = {
+        ...formData,
+        credit_limit: parseFloat(formData.credit_limit) || 0,
+        payment_terms: parseInt(formData.payment_terms) || 30,
+      };
+      onSave(submitData);
     }
   };
 
@@ -146,6 +203,7 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               error={!!errors.airline_name}
               helperText={errors.airline_name}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -158,6 +216,7 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               error={!!errors.airline_code}
               helperText={errors.airline_code}
               size="small"
+              required
               inputProps={{ maxLength: 3, style: { textTransform: 'uppercase' } }}
             />
           </Grid>
@@ -171,6 +230,7 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               error={!!errors.contact_person}
               helperText={errors.contact_person}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -184,6 +244,7 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               error={!!errors.email}
               helperText={errors.email}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -196,6 +257,7 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               error={!!errors.phone}
               helperText={errors.phone}
               size="small"
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -206,6 +268,8 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               type="number"
               value={formData.credit_limit}
               onChange={handleChange}
+              error={!!errors.credit_limit}
+              helperText={errors.credit_limit}
               size="small"
               InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
             />
@@ -218,6 +282,8 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
               type="number"
               value={formData.payment_terms}
               onChange={handleChange}
+              error={!!errors.payment_terms}
+              helperText={errors.payment_terms}
               size="small"
             />
           </Grid>
@@ -245,138 +311,142 @@ const AirlineFormDialog = ({ open, airline, onClose, onSave, loading }) => {
   );
 };
 
+// View Airline Dialog
+const ViewAirlineDialog = ({ open, airline, onClose }) => {
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ bgcolor: '#1976d2', color: 'white' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <FlightIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Airline Details
+          </Box>
+          <IconButton onClick={onClose} sx={{ color: 'white' }}>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        {airline && (
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Airline Name</Typography>
+              <Typography variant="body1" fontWeight="medium">{airline.airline_name}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Airline Code</Typography>
+              <Chip label={airline.airline_code} size="small" />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Contact Person</Typography>
+              <Typography variant="body1">{airline.contact_person}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Email</Typography>
+              <Typography variant="body1">{airline.email}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
+              <Typography variant="body1">{airline.phone}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+              <Chip
+                label={airline.status ? 'Active' : 'Inactive'}
+                color={airline.status ? 'success' : 'error'}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Credit Limit</Typography>
+              <Typography variant="body1" color="primary" fontWeight="bold">
+                {formatCurrency(airline.credit_limit || 0)}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Payment Terms</Typography>
+              <Typography variant="body1">{airline.payment_terms} days</Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Address</Typography>
+              <Typography variant="body1">{airline.address || 'Not provided'}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Created At</Typography>
+              <Typography variant="body2">{new Date(airline.created_at).toLocaleString()}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">Last Updated</Typography>
+              <Typography variant="body2">{new Date(airline.updated_at).toLocaleString()}</Typography>
+            </Grid>
+          </Grid>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // Main Airlines Component
 export default function Airlines() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-
-  const [airlines, setAirlines] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  const dispatch = useDispatch();
+  const { airlines, total, isLoading, error } = useSelector((state) => state.airlines);
+  
+  // Local state
   const [openDialog, setOpenDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedAirline, setSelectedAirline] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Load airlines from localStorage
+  // Load airlines on mount and when filters change
   useEffect(() => {
     loadAirlines();
-  }, []);
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
 
   const loadAirlines = () => {
-    setLoading(true);
-    const savedAirlines = localStorage.getItem('airlines');
-    if (savedAirlines) {
-      setAirlines(JSON.parse(savedAirlines));
-    } else {
-      const defaultAirlines = [
-        {
-          id: 1,
-          airline_name: 'Indigo Airlines',
-          airline_code: '6E',
-          contact_person: 'Rahul Mehta',
-          email: 'operations@indigo.com',
-          phone: '+91-9876543210',
-          address: 'Gurugram, India',
-          credit_limit: 5000000,
-          payment_terms: 30,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          airline_name: 'Air India',
-          airline_code: 'AI',
-          contact_person: 'Priya Sharma',
-          email: 'contact@airindia.com',
-          phone: '+91-9876543211',
-          address: 'New Delhi, India',
-          credit_limit: 10000000,
-          payment_terms: 45,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 3,
-          airline_name: 'SpiceJet',
-          airline_code: 'SG',
-          contact_person: 'Ajay Singh',
-          email: 'info@spicejet.com',
-          phone: '+91-9876543212',
-          address: 'Gurugram, India',
-          credit_limit: 3000000,
-          payment_terms: 30,
-          status: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 4,
-          airline_name: 'Vistara',
-          airline_code: 'UK',
-          contact_person: 'Vinod Kannan',
-          email: 'contact@vistara.com',
-          phone: '+91-9876543213',
-          address: 'Gurugram, India',
-          credit_limit: 4000000,
-          payment_terms: 30,
-          status: true,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      setAirlines(defaultAirlines);
-      localStorage.setItem('airlines', JSON.stringify(defaultAirlines));
-    }
-    setLoading(false);
+    const params = {
+      page: page + 1,
+      page_size: rowsPerPage,
+      search: searchTerm,
+      ...(statusFilter !== 'all' && { status: statusFilter === 'active' }),
+      ordering: '-created_at',
+    };
+    dispatch(fetchAirlines(params));
   };
 
-  // Save to localStorage
-  useEffect(() => {
-    if (airlines.length > 0) {
-      localStorage.setItem('airlines', JSON.stringify(airlines));
-    }
-  }, [airlines]);
-
-  // Filter airlines
-  useEffect(() => {
-    let filtered = [...airlines];
-
-    if (searchTerm) {
-      filtered = filtered.filter(a =>
-        a.airline_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.airline_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.contact_person.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(a =>
-        statusFilter === 'active' ? a.status : !a.status
-      );
-    }
-
-    setFilteredData(filtered);
-    setPage(0);
-  }, [airlines, searchTerm, statusFilter]);
-
+  // Update rows per page on screen resize
   useEffect(() => {
     setRowsPerPage(isMobile ? 5 : 10);
   }, [isMobile]);
 
+  // Calculate stats from actual data
   const stats = {
-    total: airlines.length,
+    total: total,
     active: airlines.filter(a => a.status).length,
     inactive: airlines.filter(a => !a.status).length,
     totalCredit: airlines.reduce((sum, a) => sum + (a.credit_limit || 0), 0),
   };
-
-  const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const handleOpenDialog = (airline = null) => {
     setSelectedAirline(airline);
@@ -388,58 +458,65 @@ export default function Airlines() {
     setSelectedAirline(null);
   };
 
-  const handleSaveAirline = (formData) => {
+  const handleSaveAirline = async (formData) => {
     setFormLoading(true);
-    
-    setTimeout(() => {
+    try {
       if (selectedAirline) {
-        const updatedAirlines = airlines.map(a =>
-          a.id === selectedAirline.id 
-            ? { ...a, ...formData, updated_at: new Date().toISOString() }
-            : a
-        );
-        setAirlines(updatedAirlines);
-        setSnackbar({ open: true, message: 'Airline updated successfully!', severity: 'success' });
+        await dispatch(updateAirline({ id: selectedAirline.id, data: formData })).unwrap();
+        showSnackbar('Airline updated successfully!', 'success');
       } else {
-        const newAirline = {
-          id: Date.now(),
-          ...formData,
-          status: true,
-          created_at: new Date().toISOString(),
-        };
-        setAirlines([newAirline, ...airlines]);
-        setSnackbar({ open: true, message: 'Airline created successfully!', severity: 'success' });
+        await dispatch(createAirline(formData)).unwrap();
+        showSnackbar('Airline created successfully!', 'success');
       }
-      setFormLoading(false);
       handleCloseDialog();
-    }, 500);
-  };
-
-  const handleDeleteAirline = () => {
-    if (deleteConfirm) {
-      setAirlines(airlines.filter(a => a.id !== deleteConfirm.id));
-      setSnackbar({ open: true, message: 'Airline deleted successfully!', severity: 'success' });
-      setDeleteConfirm(null);
+      loadAirlines();
+    } catch (err) {
+      console.error('Save error:', err);
+      const errorMessage = err?.message || err?.errors || 'Operation failed';
+      showSnackbar(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage), 'error');
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  const handleToggleStatus = (id) => {
-    const updatedAirlines = airlines.map(a =>
-      a.id === id ? { ...a, status: !a.status } : a
-    );
-    setAirlines(updatedAirlines);
-    
-    const airline = airlines.find(a => a.id === id);
-    setSnackbar({
-      open: true,
-      message: `Airline ${airline?.status ? 'deactivated' : 'activated'} successfully!`,
-      severity: 'success',
-    });
+  const handleDeleteAirline = async () => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    try {
+      await dispatch(deleteAirline(deleteConfirm.id)).unwrap();
+      showSnackbar('Airline deleted successfully!', 'success');
+      setDeleteConfirm(null);
+      loadAirlines();
+    } catch (err) {
+      console.error('Delete error:', err);
+      showSnackbar(err?.message || 'Delete failed', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      await dispatch(toggleAirlineStatus(id)).unwrap();
+      showSnackbar(`Airline ${currentStatus ? 'deactivated' : 'activated'} successfully!`, 'success');
+      loadAirlines();
+    } catch (err) {
+      console.error('Toggle status error:', err);
+      showSnackbar(err?.message || 'Status update failed', 'error');
+    }
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
+    setPage(0);
+  };
+
+  const showSnackbar = (message, severity) => {
+    setSnackbar({ open: true, message, severity });
+    setTimeout(() => {
+      dispatch(clearError());
+    }, 3000);
   };
 
   const getStatusChip = (status) => {
@@ -467,10 +544,10 @@ export default function Airlines() {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(amount || 0);
   };
 
-  if (loading) {
+  if (isLoading && airlines.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <CircularProgress />
@@ -558,6 +635,13 @@ export default function Airlines() {
         </Grid>
       </Grid>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => dispatch(clearError())}>
+          {typeof error === 'string' ? error : JSON.stringify(error)}
+        </Alert>
+      )}
+
       {/* Actions Bar */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -620,14 +704,14 @@ export default function Airlines() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedData.length === 0 ? (
+              {airlines.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={isMobile ? 6 : 9} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">No airlines found</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedData.map((airline) => (
+                airlines.map((airline) => (
                   <TableRow key={airline.id} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
@@ -654,6 +738,18 @@ export default function Airlines() {
                     <TableCell>{getStatusChip(airline.status)}</TableCell>
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
+                        <Tooltip title="View">
+                          <IconButton 
+                            size="small" 
+                            color="info" 
+                            onClick={() => {
+                              setSelectedAirline(airline);
+                              setOpenViewDialog(true);
+                            }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Edit">
                           <IconButton size="small" color="primary" onClick={() => handleOpenDialog(airline)}>
                             <EditIcon fontSize="small" />
@@ -663,7 +759,7 @@ export default function Airlines() {
                           <IconButton
                             size="small"
                             color={airline.status ? 'warning' : 'success'}
-                            onClick={() => handleToggleStatus(airline.id)}
+                            onClick={() => handleToggleStatus(airline.id, airline.status)}
                           >
                             {airline.status ? <CancelIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                           </IconButton>
@@ -691,7 +787,7 @@ export default function Airlines() {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
-          count={filteredData.length}
+          count={total}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
@@ -711,6 +807,13 @@ export default function Airlines() {
         loading={formLoading}
       />
 
+      {/* View Airline Dialog */}
+      <ViewAirlineDialog
+        open={openViewDialog}
+        airline={selectedAirline}
+        onClose={() => setOpenViewDialog(false)}
+      />
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)}>
         <DialogTitle sx={{ bgcolor: '#f44336', color: 'white' }}>
@@ -726,8 +829,8 @@ export default function Airlines() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-          <Button onClick={handleDeleteAirline} color="error" variant="contained">
-            Delete
+          <Button onClick={handleDeleteAirline} color="error" variant="contained" disabled={deleteLoading}>
+            {deleteLoading ? <CircularProgress size={24} /> : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

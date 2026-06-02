@@ -1,3 +1,4 @@
+// store/slices/airportSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import airportService from '../../services/airportService';
 
@@ -73,6 +74,20 @@ export const toggleAirportStatus = createAsyncThunk(
   }
 );
 
+// Export this with the name your component is expecting
+export const updateAirportFuelStock = createAsyncThunk(
+  'airports/updateAirportFuelStock',
+  async ({ id, current_fuel_stock }, { rejectWithValue }) => {
+    try {
+      const response = await airportService.updateFuelStock(id, current_fuel_stock);
+      return { id, current_fuel_stock: response.new_stock };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Keep the old name for backward compatibility
 export const updateAirportStock = createAsyncThunk(
   'airports/updateAirportStock',
   async ({ id, quantity, operation }, { rejectWithValue }) => {
@@ -142,6 +157,12 @@ const airportSlice = createSlice({
         const index = state.airports.findIndex(a => a.id === action.payload.id);
         if (index !== -1) {
           state.airports[index].status = action.payload.status;
+        }
+      })
+      .addCase(updateAirportFuelStock.fulfilled, (state, action) => {
+        const index = state.airports.findIndex(a => a.id === action.payload.id);
+        if (index !== -1) {
+          state.airports[index].current_fuel_stock = action.payload.current_fuel_stock;
         }
       })
       .addCase(updateAirportStock.fulfilled, (state, action) => {
