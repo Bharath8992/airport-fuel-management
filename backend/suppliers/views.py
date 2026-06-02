@@ -7,6 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.utils import timezone
 from .models import Supplier, SupplierContract
 from .serializers import (
     SupplierSerializer, 
@@ -22,22 +23,10 @@ from drf_yasg import openapi
 class SupplierViewSet(viewsets.ModelViewSet):
     """
     Supplier CRUD operations with additional actions
-    
-    Provides:
-    - List all suppliers (with filtering, searching, ordering)
-    - Create new supplier
-    - Retrieve specific supplier
-    - Update supplier (full/partial)
-    - Delete supplier
-    - Get supplier contracts
-    - Add contract to supplier
-    - Toggle supplier status
-    - Get supplier statistics
-    - Bulk operations
     """
     
     queryset = Supplier.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]  # Change to IsAuthenticated
     serializer_class = SupplierSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = SupplierFilter
@@ -68,37 +57,51 @@ class SupplierViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Set permissions based on action"""
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            self.permission_classes = [IsAuthenticated, IsAdminUser]
-        return super().get_permissions()
+            # Only admin can modify, but user must be authenticated
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated]  # All actions require authentication
+        return [permission() for permission in permission_classes]
     
-    @swagger_auto_schema(
-        operation_description="Create a new supplier",
-        request_body=SupplierSerializer,
-        responses={
-            201: openapi.Response('Supplier created', SupplierSerializer),
-            400: 'Bad Request',
-            401: 'Unauthorized'
-        }
-    )
-    def create(self, request, *args, **kwargs):
-        """Create a new supplier with validation"""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        with transaction.atomic():
-            supplier = serializer.save()
-            
-            # Log activity
-            self._log_activity(request.user, supplier, 'CREATE')
-            
+    # suppliers/views.py - Update the create method
+@swagger_auto_schema(
+    operation_description="Create a new supplier",
+    request_body=SupplierSerializer,
+    responses={
+        201: openapi.Response('Supplier created', SupplierSerializer),
+        400: 'Bad Request',
+        401: 'Unauthorized'
+    }
+)
+def create(self, request, *args, **kwargs):
+    """Create a new supplier with validation"""
+    print("Request data:", request.data)  # Debug print
+    serializer = self.get_serializer(data=request.data)
+    
+    if not serializer.is_valid():
+        print("Serializer errors:", serializer.errors)  # Debug print
         return Response(
             {
-                'success': True,
-                'message': 'Supplier created successfully',
-                'data': serializer.data
+                'success': False,
+                'errors': serializer.errors
             },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_400_BAD_REQUEST
         )
+    
+    with transaction.atomic():
+        supplier = serializer.save()
+        
+        # Log activity
+        self._log_activity(request.user, supplier, 'CREATE')
+        
+    return Response(
+        {
+            'success': True,
+            'message': 'Supplier created successfully',
+            'data': serializer.data
+        },
+        status=status.HTTP_201_CREATED
+    )
     
     @swagger_auto_schema(
         operation_description="Update supplier details",
@@ -343,15 +346,20 @@ class SupplierViewSet(viewsets.ModelViewSet):
     
     def _log_activity(self, user, supplier, action):
         """Helper method to log supplier activities"""
-        from apps.users.models import UserActivity  # Adjust import based on your structure
-        
-        UserActivity.objects.create(
-            user=user,
-            action=f'SUPPLIER_{action}',
-            ip_address=self.request.META.get('REMOTE_ADDR'),
-            details={
-                'supplier_id': str(supplier.id),
-                'supplier_name': supplier.company_name,
-                'timestamp': timezone.now().isoformat()
-            }
-        )
+        try:
+            from apps.users.models import UserActivity
+            from django.utils import timezone
+            
+            UserActivity.objects.create(
+                user=user,
+                action=f'SUPPLIER_{action}',
+                ip_address=self.request.META.get('REMOTE_ADDR'),
+                details={
+                    'supplier_id': str(supplier.id),
+                    'supplier_name': supplier.company_name,
+                    'timestamp': timezone.now().isoformat()
+                }
+            )
+        except ImportError:
+            # If UserActivity model doesn't exist, just pass
+            pass

@@ -1,3 +1,4 @@
+# fuel_management/urls.py
 """
 URL configuration for fuel_management project.
 """
@@ -25,14 +26,18 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
-    path('api/', include('suppliers.urls')),
+    path('api/', include('suppliers.urls')),  # This will now include /api/suppliers/
     path('api/airlines/', include('airlines.urls')),
     path('api/airports/', include('airports.urls')),
     path('api/transactions/', include('transactions.urls')),
-    path('api/invoices/', include('invoices.urls')),  # This should point to invoices/urls.py
+    path('api/invoices/', include('invoices.urls')),
     path('api/reports/', include('reports.urls')),
+    path('api/dashboard/', include('dashboard.urls')),
+    
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0)),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0)),
+
+    
 ]
 
 if settings.DEBUG:

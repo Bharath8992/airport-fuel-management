@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'transactions',
     'invoices',
     'reports',
+    'dashboard',
 ]
 
 MIDDLEWARE = [
@@ -77,24 +78,24 @@ TEMPLATES = [
 WSGI_APPLICATION = 'fuel_management.wsgi.application'
 
 # Database - Update to use PostgreSQL from .env
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='fuel_management'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-}
-
-# If you want to use SQLite temporarily (for testing without PostgreSQL), uncomment this:
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': config('DB_NAME', default='fuel_management'),
+#         'USER': config('DB_USER', default='postgres'),
+#         'PASSWORD': config('DB_PASSWORD', default='postgres'),
+#         'HOST': config('DB_HOST', default='localhost'),
+#         'PORT': config('DB_PORT', default='5432'),
 #     }
 # }
+
+# If you want to use SQLite temporarily (for testing without PostgreSQL), uncomment this:
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

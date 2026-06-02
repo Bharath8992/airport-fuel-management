@@ -1,5 +1,6 @@
 # suppliers/serializers.py
 from rest_framework import serializers
+from django.utils import timezone
 from .models import Supplier, SupplierContract
 
 class SupplierContractSerializer(serializers.ModelSerializer):
@@ -30,17 +31,16 @@ class SupplierContractSerializer(serializers.ModelSerializer):
         return data
 
 class SupplierListSerializer(serializers.ModelSerializer):
-    """Simplified serializer for list view"""
+    """Simplified serializer for list view - INCLUDING GST and ADDRESS"""
     contract_count = serializers.IntegerField(source='contracts.count', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = Supplier
         fields = [
             'id', 'company_name', 'contact_person', 'email', 
-            'phone', 'status', 'status_display', 'contract_count',
-            'fuel_types', 'created_at'
-        ]
+            'phone', 'address', 'gst_number', 'status', 'contract_count',
+            'fuel_types', 'created_at', 'updated_at'
+        ]  # Added 'address' and 'gst_number' here
 
 class SupplierDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer with contracts"""
@@ -64,6 +64,10 @@ class SupplierSerializer(serializers.ModelSerializer):
         model = Supplier
         fields = '__all__'
         read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'address': {'required': False, 'allow_blank': True},
+            'fuel_types': {'required': False},
+        }
     
     def validate_gst_number(self, value):
         """Validate GST number format"""

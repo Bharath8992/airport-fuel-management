@@ -1,23 +1,14 @@
 # suppliers/filters.py
-from django_filters import rest_framework as filters
+import django_filters
 from .models import Supplier
 
-class SupplierFilter(filters.FilterSet):
-    """
-    Advanced filtering for suppliers
-    """
-    company_name_contains = filters.CharFilter(field_name='company_name', lookup_expr='icontains')
-    created_after = filters.DateFilter(field_name='created_at', lookup_expr='gte')
-    created_before = filters.DateFilter(field_name='created_at', lookup_expr='lte')
-    fuel_type = filters.CharFilter(field_name='fuel_types', lookup_expr='contains')
-    gst_number = filters.CharFilter(field_name='gst_number', lookup_expr='iexact')
+class SupplierFilter(django_filters.FilterSet):
+    status = django_filters.BooleanFilter()
+    company_name = django_filters.CharFilter(lookup_expr='icontains')
+    contact_person = django_filters.CharFilter(lookup_expr='icontains')
+    email = django_filters.CharFilter(lookup_expr='icontains')
+    fuel_types = django_filters.CharFilter(lookup_expr='icontains')
     
     class Meta:
         model = Supplier
-        fields = {
-            'status': ['exact'],
-            'company_name': ['exact', 'icontains'],
-            'email': ['exact', 'icontains'],
-            'phone': ['exact'],
-            'gst_number': ['exact', 'icontains'],
-        }
+        fields = ['status', 'company_name', 'contact_person', 'email', 'fuel_types']
